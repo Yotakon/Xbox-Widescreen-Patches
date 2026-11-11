@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Parche widescreen 16:9 (Hor+) para Brute Force (Xbox, MS-030, title ID 4D53001E).
 
-Uso: python3 brute_force_ws_patch.py brute_force.xbe salida.xbe
+Uso: python3 brute_force_ws_patch.py brute_force.xbe salida.xbe [--v1]
+     --v1 genera la versión anterior (sin la corrección del culling 5)
 
 El motor define la cámara por FOV horizontal: tanH = tan(fovh/2) y
 tanV = tanH / hvaspect (4/3). El parche deja el FOV vertical original y
@@ -15,6 +16,10 @@ ensancha el horizontal x4/3 en los sitios donde se consume:
   3. Escala X mundo<->pantalla (campo +0x38 de la cámara, en 0x6AD00 y
      0x6AB30): halfW/tanH pasa a multiplicarse por 0.75, para que los
      marcadores proyectados sobre el mundo queden en su sitio.
+  5. (v2) Culling por esfera del objeto cámara (método 0x6AE20): usa una
+     normal de plano lateral propia (campos +0x40..+0x48) calculada con tanH
+     en 0x6AD00 y 0x6AB30. En v1 seguía en 4:3 y los objetos desaparecían en
+     los bordes al girar. Ahora +0x48 = tanH*4/3 antes de normalizar.
 
 Como el factor se aplica sobre el aspect que calcula el juego, también vale
 para los viewports de pantalla dividida. El HUD 2D y los vídeos quedan
@@ -76,11 +81,28 @@ PATCHES = [
     (0x6ABCC, bytes.fromhex("d87024" "d95838"), call(0x6ABCC, CAVE_XS2) + b"\x90"),
 ]
 
+CAVE_CULL = 0x6B7E3   # 13 bytes de relleno tras ret
+
+# v2: normal del plano lateral del culling por esfera (+0x48 = tanH*4/3)
+PATCHES_V2 = [
+    # fld [eax+24h] ; fdiv 0.75 ; fst [eax+48h] ; ret
+    (CAVE_CULL, b"\x90" * 13,
+     bytes.fromhex("d94024") + FDIV_075 + bytes.fromhex("d95048c3")),
+    # 0x6AD00: mov [eax+48h],edx ; fld [eax+48h]  ->  call cave ; nop
+    (0x6AD3C, bytes.fromhex("895048" "d94048"), call(0x6AD3C, CAVE_CULL) + b"\x90"),
+    # 0x6AB30: mov [eax+48h],edx ; mov [eax+44h],ecx ; fld [eax+48h]
+    #       -> mov [eax+44h],ecx ; call cave ; nop
+    (0x6ABE1, bytes.fromhex("895048" "894844" "d94048"),
+     bytes.fromhex("894844") + call(0x6ABE4, CAVE_CULL) + b"\x90"),
+]
+
 
 def main():
-    if len(sys.argv) != 3:
+    args = [a for a in sys.argv[1:] if a != "--v1"]
+    v1 = "--v1" in sys.argv[1:]
+    if len(args) != 2:
         sys.exit(__doc__)
-    d = bytearray(open(sys.argv[1], "rb").read())
+    d = bytearray(open(args[0], "rb").read())
     if d[:4] != b"XBEH":
         sys.exit("No es un XBE")
     secs = parse_sections(d)
@@ -91,7 +113,7 @@ def main():
                 return va - sva + ra
         raise ValueError(hex(va))
 
-    for va, orig, new in PATCHES:
+    for va, orig, new in PATCHES + ([] if v1 else PATCHES_V2):
         assert len(orig) == len(new), hex(va)
         o = va2off(va)
         cur = bytes(d[o:o + len(orig)])
@@ -103,8 +125,8 @@ def main():
         d[o:o + len(new)] = new
         print(f"{va:#x} (archivo {o:#x}): {orig.hex().upper()} -> {new.hex().upper()}")
 
-    open(sys.argv[2], "wb").write(d)
-    print("OK ->", sys.argv[2])
+    open(args[1], "wb").write(d)
+    print("OK ->", args[1])
 
 
 if __name__ == "__main__":
