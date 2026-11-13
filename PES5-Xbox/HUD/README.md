@@ -48,3 +48,22 @@ Con eso se hará un IPS por parte (cada uno cambia solo 4 bytes de la tabla de m
 ## Regenerar
 
 `python3 build_hud.py <carpeta_salida>` (necesita `keystone-engine`).
+
+## Ejecutables listos (sobre `PES5_WS_ampliado.xbe` de la release 1.3, MD5 c212ebbb0caeff99d868a82c78abdfdd)
+
+| Archivo | MD5 |
+|---|---|
+| `PES5_WS_ampliado_HUDauto.xbe` | d7270206f754958c4e4bdb354581a466 |
+| `PES5_WS_ampliado_HUDcentrado.xbe` | 0b407560c684aaf2fb8ee4c5227a589d |
+| `pruebas/PES5_WS_ampliado_prueba_1.xbe` | a7df897a1166db54b73f14cf4d5e8c9e |
+| `pruebas/PES5_WS_ampliado_prueba_2.xbe` | 77a47b17b375bb6ad7780adcdd3d71b0 |
+| `pruebas/PES5_WS_ampliado_prueba_3.xbe` | 3b4deffa8a50ca90e3dcf67182a4ded0 |
+| `pruebas/PES5_WS_ampliado_prueba_4.xbe` | b3fc0e29143ce45e9c70f80b9db73862 |
+| `pruebas/PES5_WS_ampliado_prueba_5.xbe` | 691a1c18eb6a2915627c2e984429ac66 |
+
+## Resultados de las pruebas hechas
+
+- **auto**: los textos, barras y paneles salen cortados (se dibujan en trozos y cada trozo se ancla por separado).
+- **centrado**: sin cortes, pero todo el contenido ocupa el 56 % del ancho en lugar del 75 %
+  (escala 0,5625 = 0,75 x 0,75, margen izquierdo 140 en vez de 80). Parece que la transformación
+  se aplica dos veces, por ejemplo si hay un dibujo final a pantalla completa que también pasa por el gancho.
