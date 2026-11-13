@@ -10,7 +10,8 @@ restaura despues (los buffers del juego quedan intactos).
 Modos:  0 sin cambio | 1 centrado 4:3 | 2 anclado a la izquierda
         3 anclado a la derecha | 4 auto (lado mas cercano; a pantalla
         completa no se toca) | 5 PRUEBA: X x0,5 hacia la izquierda |
-        6 centrado, pero lo que cubre todo el ancho no se toca
+        6 centrado, pero lo que cubre todo el ancho no se toca |
+        7 PRUEBA: X x0,5 hacia la derecha | 8 PRUEBA: X x0,5 al centro
 Con W = ancho de pantalla ([0x7DDF08]): x' = 0,75 x + off,
 off = W/8 (centrado), 0 (izq), W/4 (der).
 
@@ -39,8 +40,8 @@ HOOK_ORIG = bytes.fromhex('558bec83ec14')      # push ebp; mov ebp,esp; sub esp,
 HOOK_RET = 0x4DD166
 CAVE = 0x40CE80
 CAVE_SIZE = 742
-CONST = CAVE + 0x1B0
-TABLE = CAVE + 0x200
+CONST = CAVE + 0x1E0
+TABLE = CAVE + 0x210
 MAX_VERTS = 128
 
 # (direccion de la llamada a 0x4DD160, nombre provisional)
@@ -108,8 +109,24 @@ save:
     cmp ebp, 6
     je auto
     cmp ebp, 5
-    jne center
+    je sql
+    cmp ebp, 7
+    je sqr
+    cmp ebp, 8
+    je sqc
+    jmp center
+sql:
     movss xmm5, [{KADDR['k05']}]
+    jmp apply
+sqr:
+    movss xmm5, [{KADDR['k05']}]
+    movss xmm4, xmm7
+    mulss xmm4, [{KADDR['k05']}]
+    jmp apply
+sqc:
+    movss xmm5, [{KADDR['k05']}]
+    movss xmm4, xmm7
+    mulss xmm4, [{KADDR['k025']}]
     jmp apply
 center:
     movss xmm4, xmm7
@@ -201,10 +218,10 @@ def assemble():
 def build(modes):
     """modes: dict direccion_llamada -> modo. Devuelve {offset_archivo: bytes}."""
     code = assemble()
-    assert len(code) <= 0x1B0, len(code)
+    assert len(code) <= 0x1E0, len(code)
     consts = b''.join(struct.pack('<f', v) for v in K.values())
     table = b''.join(struct.pack('<II', a + 5, modes.get(a, 0)) for a, _ in CALLS) + b'\0' * 8
-    assert 0x200 + len(table) <= CAVE_SIZE
+    assert 0x210 + len(table) <= CAVE_SIZE
     rel = struct.pack('<i', CAVE - (HOOK_VA + 5))
     return {
         va2off(HOOK_VA): b'\xE9' + rel + b'\x90',
@@ -244,6 +261,22 @@ VARIANTS = {
 for _n, _g in GROUPS.items():
     VARIANTS[f'PES5_HUD_prueba_{_n[-1]}'] = {a: 5 for a in _g}
 
+# Identificacion exacta en dos pasadas. Cada llamada recibe un estado por pasada:
+# 0 sin cambio, 1 aplastada a la izquierda (modo 5), 2 a la derecha (7), 3 al centro (8).
+# Las cuatro llamadas ya identificadas (dibujos finales a pantalla completa y velo
+# del fundido) van siempre en modo 6 para no tapar el resto.
+KNOWN = [0x1A66C, 0x1AAE3, 0x1A377, 0x1C779]
+IDENT_SITES = [a for a in ALL if a not in KNOWN]
+IDENT_CODES = [(1, 0), (2, 0), (3, 0), (0, 1), (0, 2), (0, 3), (1, 1),
+               (2, 2), (3, 3), (1, 2), (2, 1), (1, 3), (3, 1), (2, 3)]
+STATE_MODE = {0: 0, 1: 5, 2: 7, 3: 8}
+assert len(IDENT_SITES) == len(IDENT_CODES)
+for _p, _name in ((0, 'A'), (1, 'B')):
+    _m = {a: 6 for a in KNOWN}
+    for a, code in zip(IDENT_SITES, IDENT_CODES):
+        _m[a] = STATE_MODE[code[_p]]
+    VARIANTS[f'PES5_HUD_ident_{_name}'] = _m
+
 
 def main(outdir, xbe_path=None):
     os.makedirs(outdir, exist_ok=True)
@@ -261,4 +294,4 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         main(sys.argv[1])
     else:
-        print(len(assemble()), 'bytes de codigo (maximo', 0x1B0, ')')
+        print(len(assemble()), 'bytes de codigo (maximo', 0x1E0, ')')
