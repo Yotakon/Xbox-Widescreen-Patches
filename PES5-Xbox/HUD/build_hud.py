@@ -9,7 +9,8 @@ restaura despues (los buffers del juego quedan intactos).
 
 Modos:  0 sin cambio | 1 centrado 4:3 | 2 anclado a la izquierda
         3 anclado a la derecha | 4 auto (lado mas cercano; a pantalla
-        completa no se toca) | 5 PRUEBA: X x0,5 hacia la izquierda
+        completa no se toca) | 5 PRUEBA: X x0,5 hacia la izquierda |
+        6 centrado, pero lo que cubre todo el ancho no se toca
 Con W = ancho de pantalla ([0x7DDF08]): x' = 0,75 x + off,
 off = W/8 (centrado), 0 (izq), W/4 (der).
 
@@ -104,6 +105,8 @@ save:
     je right
     cmp ebp, 4
     je auto
+    cmp ebp, 6
+    je auto
     cmp ebp, 5
     jne center
     movss xmm5, [{KADDR['k05']}]
@@ -128,6 +131,8 @@ auto:
     movss xmm5, [{KADDR['k1']}]
     jmp apply
 notfull:
+    cmp ebp, 6
+    je center
     addss xmm0, xmm1
     mulss xmm0, [{KADDR['k05']}]
     movss xmm2, xmm7
@@ -234,6 +239,7 @@ GROUPS = {
 VARIANTS = {
     'PES5_HUD_centrado': {a: 1 for a in ALL},
     'PES5_HUD_auto': {a: 4 for a in ALL},
+    'PES5_HUD_centrado2': {a: 6 for a in ALL},
 }
 for _n, _g in GROUPS.items():
     VARIANTS[f'PES5_HUD_prueba_{_n[-1]}'] = {a: 5 for a in _g}

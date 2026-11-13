@@ -67,3 +67,22 @@ Con eso se hará un IPS por parte (cada uno cambia solo 4 bytes de la tabla de m
 - **centrado**: sin cortes, pero todo el contenido ocupa el 56 % del ancho en lugar del 75 %
   (escala 0,5625 = 0,75 x 0,75, margen izquierdo 140 en vez de 80). Parece que la transformación
   se aplica dos veces, por ejemplo si hay un dibujo final a pantalla completa que también pasa por el gancho.
+
+## Hallazgos de las pruebas 1 y 2
+
+- **Prueba 1** (llamadas 0x18F87, 0x1A377, 0x1A66C, 0x1AAE3): se aplasta todo el 2D, fondos incluidos, al 50 %.
+  Hay un dibujo final de una textura a pantalla completa (funciones 0x1A400, 0x1A690 y 0x19F80 arman un
+  cuadrado de 0 a ancho-0,5 por 0 a alto-0,5). El centrado lo transformaba por segunda vez (escala 0,5625).
+- **Prueba 2** (0x1AF22, 0x1B3A5, 0x1C42D, 0x1C779): el velo del fundido a negro solo cubre la mitad izquierda.
+  Lo dibuja 0x1C68C, que rellena (0,0)-(ancho,alto) con color y transparencia (llamada 0x1C779).
+
+## `PES5_HUD_centrado2` (modo 6)
+
+Centrado (x' = 0,75 x + W/8) igual que `PES5_HUD_centrado`, pero un dibujo cuyos vértices cubren todo el
+ancho (mínimo <= 2 % y máximo >= 98 %) se deja sin tocar. Pensado para no transformar dos veces el dibujo final
+ni encoger el velo del fundido. Los IPS anteriores se generaron con una versión previa del código
+(sin el modo 6); se comportan igual en los modos que usan.
+
+| Archivo | MD5 |
+|---|---|
+| `PES5_WS_ampliado_HUDcentrado2.xbe` | 4035193e2ab232f2749b854aece27ab5 |
